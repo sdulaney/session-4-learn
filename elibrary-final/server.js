@@ -45,7 +45,7 @@ app.get('/library', function (request, response) {
 /**
  * Define the route to add a book to the library. We are posted the title, author, isbn,
  * and number of copies.
- * If the inputs are valid, create a new book objects and push it into the array.
+ * If the inputs are valid, create a new book objects and inserts it into the database.
  * Redirect to the library (to re-render the page)
  * If the inputs are not valid, render the error page.
  */
@@ -69,9 +69,8 @@ app.post('/books/add', function(request, response) {
 /**
  * Delete a book by its ISBN. We defined a variable in our route, and express puts its
  * into request.params.isbn, since we named the variable `isbn` in the route path.
- * We loop through the list of books to find the index of the one with an ISBN of the
- * give one, and once we do, we remove it (see Array.splice, MDN), and stop checking, 
- * to immediately refresh the library.
+ * We first find the book object in the database by finding by ISBN, then we remove
+ * that object in the database table and redirect to /library.
  */
 app.get('/books/delete/:isbn', function(request, response) {
 	Book.find({ isbn: request.params.isbn }).remove(function (err) {
@@ -113,7 +112,6 @@ db.on('connect', function(err) {
 
 var defineBookSchema = function(callback) {
 	Book = db.define('book', {
-		// id:     {type: 'serial', key: true},
 		title:  {type: 'text'},
 		author: {type: 'text'},
 		copies: {type: 'number'},
