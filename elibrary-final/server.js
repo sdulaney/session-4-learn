@@ -5,7 +5,6 @@ var bodyParser = require('body-parser');
 // Instantiate the "app" to start creating server endpoints
 var app = express();
 var path = require('path');
-var books = initBooks();
 
 // expose all files in public/ to be accessible from the root of our website
 app.use(express.static('public'));
@@ -36,8 +35,10 @@ app.get('/error', function (request, response) {
 });
 
 app.get('/library', function (request, response) {
-	response.render('library', {
-		books: books
+	Book.all(function(err, results) {
+		response.render('library', {
+			books: results
+		});
 	});
 });
 
@@ -55,12 +56,14 @@ app.post('/books/add', function(request, response) {
 	let copies = parseInt(request.body.copies);
 	
 	if (title.length > 0 && author.length > 0 && isbn.length > 0 && copies > 0) {
-		books.push({title, author, isbn, copies});
+		insertBookIntoDatabase(title, author, copies, isbn);
 		response.redirect('/library');
 	} else {
 		console.log("You tried to add an invalid book into the elibrary.");
 		response.redirect('/error');
 	}
+
+
 });
 
 /**
@@ -71,15 +74,9 @@ app.post('/books/add', function(request, response) {
  * to immediately refresh the library.
  */
 app.get('/books/delete/:isbn', function(request, response) {
-	var isbn = request.params.isbn;
-	for (var i = 0; i < books.length; i++) {
-		if (books[i].isbn === isbn) {
-			books.splice(i, 1);
-			break;
-		}
-	}
-
-	response.redirect('/library');
+	Book.find({ isbn: request.params.isbn }).remove(function (err) {
+		response.redirect('/library');
+	});
 });
 
 //////////////////////////////////////////////////////
@@ -96,6 +93,8 @@ var db = orm.connect({
 	password : ""
 });
 
+var Book;
+
 db.on('connect', function(err) {
 	if (err) throw err;
 
@@ -103,17 +102,17 @@ db.on('connect', function(err) {
 
 	// TODO: this could be done in a better way without convoluted 
 	//       callback logic
-	var Book = defineBookSchema(function(Book) {
+	defineBookSchema(function() {
 		var initialBooks = initBooks();
 		for (var i = 0; i < initialBooks.length; i++) {
 			var book = initialBooks[i];
-			insertBookIntoDatabase(Book, book["title"], book["author"], book["copies"], book["isbn"]);			
+			insertBookIntoDatabase(book["title"], book["author"], book["copies"], book["isbn"]);			
 		}
 	});
 });
 
 var defineBookSchema = function(callback) {
-	var Book = db.define('book', {
+	Book = db.define('book', {
 		// id:     {type: 'serial', key: true},
 		title:  {type: 'text'},
 		author: {type: 'text'},
@@ -122,13 +121,11 @@ var defineBookSchema = function(callback) {
 	});
 
 	Book.sync(function() {
-		callback(Book);
+		callback();
 	});
-
-	return Book;
 };
 
-var insertBookIntoDatabase = function(Book, title, author, copies, isbn) {
+var insertBookIntoDatabase = function(title, author, copies, isbn) {
 	var newBook = {
 		title : title,
 		author : author,
