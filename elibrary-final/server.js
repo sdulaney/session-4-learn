@@ -4,6 +4,7 @@ var bodyParser = require('body-parser');
 
 // Instantiate the "app" to start creating server endpoints
 var app = express();
+var path = require('path');
 var books = initBooks();
 
 // expose all files in public/ to be accessible from the root of our website
@@ -80,6 +81,67 @@ app.get('/books/delete/:isbn', function(request, response) {
 
 	response.redirect('/library');
 });
+
+//////////////////////////////////////////////////////
+// Database methods 								//
+//////////////////////////////////////////////////////
+
+var orm = require('orm');
+
+var db = orm.connect({
+	debug : "true",
+	protocol : "mysql",
+	host     : "localhost",
+	database : "mysql",
+	password : ""
+});
+
+db.on('connect', function(err) {
+	if (err) throw err;
+
+	console.log("Connection w/ MySQL database successfully formed.");
+
+	// TODO: this could be done in a better way without convoluted 
+	//       callback logic
+	var Book = defineBookSchema(function(Book) {
+		var initialBooks = initBooks();
+		for (var i = 0; i < initialBooks.length; i++) {
+			var book = initialBooks[i];
+			insertBookIntoDatabase(Book, book["title"], book["author"], book["copies"], book["isbn"]);			
+		}
+	});
+});
+
+var defineBookSchema = function(callback) {
+	var Book = db.define('book', {
+		// id:     {type: 'serial', key: true},
+		title:  {type: 'text'},
+		author: {type: 'text'},
+		copies: {type: 'number'},
+		isbn:   {type: 'text'}
+	});
+
+	Book.sync(function() {
+		callback(Book);
+	});
+
+	return Book;
+};
+
+var insertBookIntoDatabase = function(Book, title, author, copies, isbn) {
+	var newBook = {
+		title : title,
+		author : author,
+		copies : copies,
+		isbn : isbn
+	};
+
+  	Book.create(newBook, function(err, results) {
+		if (err) throw err;
+  	});
+
+  	Book.sync();
+};
 
 //////////////////////////////////////////////////////
 // Helper Functions:                                //
