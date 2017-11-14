@@ -15,6 +15,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Set up where our application will look for client-side files (HTML, CSS, JS)
 app.set('view engine', 'hbs');
 
+// 1) TODO: Setup MySQL database and connect to it.
+
 // Server listens to port 3000
 app.listen(3000, function () {
 	console.log('Your app is listening on port 3000!');
@@ -33,12 +35,14 @@ app.get('/error', function (request, response) {
 	response.send('The book is invalid.');
 });
 
+// 2) TODO: Replace books with all books stored in your database
 app.get('/library', function (request, response) {
 	response.render('library', {
 		books: books
 	});
 });
 
+// 3) TODO: Replace adding new book to our array variable to inserting into the MySQL database
 /**
  * Define the route to add a book to the library. We are posted the title, author, isbn,
  * and number of copies.
@@ -61,6 +65,8 @@ app.post('/books/add', function(request, response) {
 	}
 });
 
+// 3) TODO: Replace looping over array variable to find and remove book from array into 
+//          querying the database and deleting it from the database
 /**
  * Delete a book by its ISBN. We defined a variable in our route, and express puts its
  * into request.params.isbn, since we named the variable `isbn` in the route path.
