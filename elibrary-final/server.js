@@ -1,3 +1,6 @@
+//////////////////////////////////////////////////////
+// Configure Server									//
+//////////////////////////////////////////////////////
 // Loads the library express which makes creating a server easy in a node application
 var express = require('express');
 var bodyParser = require('body-parser');
@@ -15,6 +18,64 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Set up where our application will look for client-side files (HTML, CSS, JS)
 app.set('view engine', 'hbs');
 
+//////////////////////////////////////////////////////
+// Database methods 								//
+//////////////////////////////////////////////////////
+// Import Sequelize and configure it
+const Sequelize = require('sequelize');
+const sequelize = new Sequelize('book', 'root', null, {
+	host: 'localhost',
+	dialect: 'mysql'
+});
+
+// Create MySQL database connection between your server and the database
+sequelize
+	.authenticate()
+	.then(function() {
+		console.log('Connection has been established successfully.');
+	})
+	.catch(function(err) {
+		console.error('Unable to connect to the database:', err);
+	});
+
+//////////////////////////////////////////////////////
+// Database setup methods							//
+//////////////////////////////////////////////////////
+// Define database schema/data structure format
+const Book = sequelize.define('book', {
+	title: { type: Sequelize.STRING },
+	author: { type: Sequelize.STRING },
+	copies: { type: Sequelize.INTEGER },
+	isbn: { type: Sequelize.STRING }
+});
+
+// Creates database table for Book.
+// Note: "force: true" will delete the table if it already exists to not cause duplicate values
+Book.sync({ force: true }).then(function () {
+	var initialBooks = initBooks();
+	// Loads array of books at once in single method and returns all books inserted
+	return Book.bulkCreate(initialBooks);
+	/* Equivalent to:
+	for (var i = 0; i < initialBooks.length; i++) {
+		var book = initialBooks[i];
+		Book.create({
+			title: book.title,
+			author: book.author,
+			copies: book.copies,
+			isbn: book.isbn
+		});
+	}
+	*/
+}).then(function (books) {
+	// After inserting all initial books into database, loop over and print out the titles
+	for (var i = 0; i < books.length; i++) {
+		console.log(books[i].title);
+	}
+})
+
+//////////////////////////////////////////////////////
+// Server endpoint setup							//
+//////////////////////////////////////////////////////
 // Server listens to port 3000
 app.listen(3000, function () {
 	console.log('Your app is listening on port 3000!');
@@ -22,7 +83,6 @@ app.listen(3000, function () {
 
 // Root web app endpoint
 app.get('/', function (request, response) {
-	// response.send('Hello World!');
 	response.render('home', {
 		title: "Title from Server",
 		content: "This is a sentence sent from the server."
@@ -34,8 +94,9 @@ app.get('/error', function (request, response) {
 	response.send('The book is invalid.');
 });
 
+// Makes a database call to find all books and pass them to our Handlebars view
 app.get('/library', function (request, response) {
-	Book.all(function(err, results) {
+	Book.findAll().then(function (results) {
 		response.render('library', {
 			books: results
 		});
@@ -49,15 +110,23 @@ app.get('/library', function (request, response) {
  * Redirect to the library (to re-render the page)
  * If the inputs are not valid, render the error page.
  */
-app.post('/books/add', function(request, response) {
-	let title = request.body.title;
-	let author = request.body.author;
-	let isbn = request.body.isbn;
-	let copies = parseInt(request.body.copies);
-	
-	if (title.length > 0 && author.length > 0 && isbn.length > 0 && copies > 0) {
-		insertBookIntoDatabase(title, author, copies, isbn);
-		response.redirect('/library');
+app.post('/books/add', function (request, response) {
+	let inputTitle = request.body.title;
+	let inputAuthor = request.body.author;
+	let inputIsbn = request.body.isbn;
+	let inputCopies = parseInt(request.body.copies);
+
+	if (inputTitle.length > 0 && inputAuthor.length > 0 && inputIsbn.length > 0 && inputCopies > 0) {
+		// Creates a new row in our database with the input data then reloads http://localhost:3000/library
+		// to see the new list of books
+		Book.create({
+			title: inputTitle,
+			author: inputAuthor,
+			copies: inputCopies,
+			isbn: inputIsbn
+		}).then(function () {
+			response.redirect('/library');
+		});
 	} else {
 		console.log("You tried to add an invalid book into the elibrary.");
 		response.redirect('/error');
@@ -72,71 +141,20 @@ app.post('/books/add', function(request, response) {
  * We first find the book object in the database by finding by ISBN, then we remove
  * that object in the database table and redirect to /library.
  */
-app.get('/books/delete/:isbn', function(request, response) {
-	Book.find({ isbn: request.params.isbn }).remove(function (err) {
-		response.redirect('/library');
-	});
-});
-
-//////////////////////////////////////////////////////
-// Database methods 								//
-//////////////////////////////////////////////////////
-
-var orm = require('orm');
-
-var db = orm.connect({
-	debug : "true",
-	protocol : "mysql",
-	host     : "localhost",
-	database : "mysql",
-	password : ""
-});
-
-var Book;
-
-db.on('connect', function(err) {
-	if (err) throw err;
-
-	console.log("Connection w/ MySQL database successfully formed.");
-
-	// TODO: this could be done in a better way without convoluted 
-	//       callback logic
-	defineBookSchema(function() {
-		var initialBooks = initBooks();
-		for (var i = 0; i < initialBooks.length; i++) {
-			var book = initialBooks[i];
-			insertBookIntoDatabase(book["title"], book["author"], book["copies"], book["isbn"]);			
+app.get('/books/delete/:isbn', function (request, response) {
+	// Get one book where the ISBN matches the one from the parameter in the URL
+	// then delete that book from the database and redirect to /library to see 
+	// the updated list of books
+	Book.find({
+		where: {
+			isbn: request.params.isbn
 		}
-	});
+	}).then(function(book) {
+		return book.destroy();
+	}).then(function() {
+		response.redirect('/library');		
+	})
 });
-
-var defineBookSchema = function(callback) {
-	Book = db.define('book', {
-		title:  {type: 'text'},
-		author: {type: 'text'},
-		copies: {type: 'number'},
-		isbn:   {type: 'text'}
-	});
-
-	Book.sync(function() {
-		callback();
-	});
-};
-
-var insertBookIntoDatabase = function(title, author, copies, isbn) {
-	var newBook = {
-		title : title,
-		author : author,
-		copies : copies,
-		isbn : isbn
-	};
-
-  	Book.create(newBook, function(err, results) {
-		if (err) throw err;
-  	});
-
-  	Book.sync();
-};
 
 //////////////////////////////////////////////////////
 // Helper Functions:                                //
@@ -146,14 +164,13 @@ var insertBookIntoDatabase = function(title, author, copies, isbn) {
 // or play around with it during the session. You   //
 // are free to do that later, though!               //
 //////////////////////////////////////////////////////
-
 function initBooks() {
 	var initialBooks = [
-		{ 
-			title: "The Three Musketeers", 
-			author: "Alexandre Dumas", 
-			copies: 7, 
-			isbn: "978-1-56619-909-4" 
+		{
+			title: "The Three Musketeers",
+			author: "Alexandre Dumas",
+			copies: 7,
+			isbn: "978-1-56619-909-4"
 		},
 		{ title: "Ivanhoe", author: "Sir Walter Scott", copies: 2, isbn: "978-1-46110-482-3" },
 		{ title: "The Count of Monte Cristo", author: "Alexandre Dumas", copies: 3, isbn: "978-1-39912-897-1" },
