@@ -23,7 +23,7 @@ app.set('view engine', 'hbs');
 //////////////////////////////////////////////////////
 // Import Sequelize and configure it
 const Sequelize = require('sequelize');
-const sequelize = new Sequelize('book', 'root', null, {
+const sequelize = new Sequelize('mysql', 'root', "my-secret-pw", {
 	host: 'localhost',
 	dialect: 'mysql'
 });
