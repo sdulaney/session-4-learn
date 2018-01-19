@@ -15,7 +15,22 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Set up where our application will look for client-side files (HTML, CSS, JS)
 app.set('view engine', 'hbs');
 
-// 1) TODO: Setup MySQL database and connect to it.
+// Import Sequelize and configure it
+const Sequelize = require('sequelize');
+const sequelize = new Sequelize('mysql', 'root', 'my-secret-pw', {
+	host: 'localhost',
+	dialect: 'mysql'
+});
+
+// Create MySQL database connection between server and the database
+sequelize
+	.authenticate()
+	.then(function() {
+		console.log('Connection has been established successfully.');
+	})
+	.catch(function(err) {
+		console.error('Unable to connect to the database:', err);
+	});
 
 // Server listens to port 3000
 app.listen(3000, function () {
