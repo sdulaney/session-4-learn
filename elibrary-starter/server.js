@@ -15,7 +15,40 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Set up where our application will look for client-side files (HTML, CSS, JS)
 app.set('view engine', 'hbs');
 
-// 1) TODO: Setup MySQL database and connect to it.
+// Import Sequelize and configure it
+const Sequelize = require('sequelize');
+const sequelize = new Sequelize('mysql', 'root', 'my-secret-pw', {
+	host: 'localhost',
+	dialect: 'mysql'
+});
+
+// Create MySQL database connection between server and the database
+sequelize
+	.authenticate()
+	.then(function() {
+		console.log('Connection has been established successfully.');
+	})
+	.catch(function(err) {
+		console.error('Unable to connect to the database:', err);
+	});
+
+// Define database schema/data structure format
+const Book = sequelize.define('book', {
+	title: { type: Sequelize.STRING },
+	author: { type: Sequelize.STRING },
+	copies: { type: Sequelize.INTEGER },
+	isbn: { type: Sequelize.STRING }
+});
+
+// Create database table for Book
+Book.sync({ force: true }).then(function() {
+	var initialBooks = initBooks();
+	return Book.bulkCreate(initialBooks);
+}).then(function(books) {
+	for(var i = 0; i < books.length; i++) {
+		console.log(books[i].title);
+	}
+})
 
 // Server listens to port 3000
 app.listen(3000, function () {
@@ -35,55 +68,59 @@ app.get('/error', function (request, response) {
 	response.send('The book is invalid.');
 });
 
-// 2) TODO: Replace books with all books stored in your database
+// Make database call to find all books and pass them to handlebars view
 app.get('/library', function (request, response) {
-	response.render('library', {
-		books: books
+	Book.findAll().then(function(results) {
+		response.render('library', {
+			books: results
+		});
 	});
 });
 
-// 3) TODO: Replace adding new book to our array variable to inserting into the MySQL database
 /**
  * Define the route to add a book to the library. We are posted the title, author, isbn,
  * and number of copies.
- * If the inputs are valid, create a new book objects and push it into the array.
+ * If the inputs are valid, create a new book objects and inserts it into the database.
  * Redirect to the library (to re-render the page)
  * If the inputs are not valid, render the error page.
  */
 app.post('/books/add', function(request, response) {
-	let title = request.body.title;
-	let author = request.body.author;
-	let isbn = request.body.isbn;
-	let copies = parseInt(request.body.copies);
+	let inputTitle = request.body.title;
+	let inputAuthor = request.body.author;
+	let inputIsbn = request.body.isbn;
+	let inputCopies = parseInt(request.body.copies);
 	
-	if (title.length > 0 && author.length > 0 && isbn.length > 0 && copies > 0) {
-		books.push({title, author, isbn, copies});
-		response.redirect('/library');
+	if (inputTitle.length > 0 && inputAuthor.length > 0 && inputIsbn.length > 0 && inputCopies > 0) {
+		Book.create({
+			title: inputTitle,
+			author: inputAuthor,
+			copies: inputCopies,
+			isbn: inputIsbn
+		}).then(function() {
+			response.redirect('/library');
+		})
 	} else {
 		console.log("You tried to add an invalid book into the elibrary.");
 		response.redirect('/error');
 	}
 });
 
-// 3) TODO: Replace looping over array variable to find and remove book from array into 
-//          querying the database and deleting it from the database
 /**
  * Delete a book by its ISBN. We defined a variable in our route, and express puts its
  * into request.params.isbn, since we named the variable `isbn` in the route path.
- * We loop through the list of books to find the index of the one with an ISBN of the
- * give one, and once we do, we remove it (see Array.splice, MDN), and stop checking, 
- * to immediately refresh the library.
+ * We first find the book object in the database by finding by ISBN, then we remove
+ * that object in the database table and redirect to /library.
  */
 app.get('/books/delete/:isbn', function(request, response) {
-	var isbn = request.params.isbn;
-	for (var i = 0; i < books.length; i++) {
-		if (books[i].isbn === isbn) {
-			books.splice(i, 1);
-			break;
+	Book.find({
+		where: {
+			isbn: request.params.isbn
 		}
-	}
-
-	response.redirect('/library');
+	}).then(function(book) {
+		return book.destroy();
+	}).then(function() {
+		response.redirect('/library');
+	})
 });
 
 //////////////////////////////////////////////////////
