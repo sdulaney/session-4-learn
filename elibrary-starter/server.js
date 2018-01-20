@@ -105,25 +105,22 @@ app.post('/books/add', function(request, response) {
 	}
 });
 
-// 3) TODO: Replace looping over array variable to find and remove book from array into 
-//          querying the database and deleting it from the database
 /**
  * Delete a book by its ISBN. We defined a variable in our route, and express puts its
  * into request.params.isbn, since we named the variable `isbn` in the route path.
- * We loop through the list of books to find the index of the one with an ISBN of the
- * give one, and once we do, we remove it (see Array.splice, MDN), and stop checking, 
- * to immediately refresh the library.
+ * We first find the book object in the database by finding by ISBN, then we remove
+ * that object in the database table and redirect to /library.
  */
 app.get('/books/delete/:isbn', function(request, response) {
-	var isbn = request.params.isbn;
-	for (var i = 0; i < books.length; i++) {
-		if (books[i].isbn === isbn) {
-			books.splice(i, 1);
-			break;
+	Book.find({
+		where: {
+			isbn: request.params.isbn
 		}
-	}
-
-	response.redirect('/library');
+	}).then(function(book) {
+		return book.destroy();
+	}).then(function() {
+		response.redirect('/library');
+	})
 });
 
 //////////////////////////////////////////////////////
