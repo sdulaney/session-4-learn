@@ -32,6 +32,24 @@ sequelize
 		console.error('Unable to connect to the database:', err);
 	});
 
+// Define database schema/data structure format
+const Book = sequelize.define('book', {
+	title: { type: Sequelize.STRING },
+	author: { type: Sequelize.STRING },
+	copies: { type: Sequelize.INTEGER },
+	isbn: { type: Sequelize.STRING }
+});
+
+// Create database table for Book
+Book.sync({ force: true }).then(function() {
+	var initialBooks = initBooks();
+	return Book.bulkCreate(initialBooks);
+}).then(function(books) {
+	for(var i = 0; i < books.length; i++) {
+		console.log(books[i].title);
+	}
+})
+
 // Server listens to port 3000
 app.listen(3000, function () {
 	console.log('Your app is listening on port 3000!');
