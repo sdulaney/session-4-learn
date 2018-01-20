@@ -68,10 +68,12 @@ app.get('/error', function (request, response) {
 	response.send('The book is invalid.');
 });
 
-// 2) TODO: Replace books with all books stored in your database
+// Make database call to find all books and pass them to handlebars view
 app.get('/library', function (request, response) {
-	response.render('library', {
-		books: books
+	Book.findAll().then(function(results) {
+		response.render('library', {
+			books: results
+		});
 	});
 });
 
