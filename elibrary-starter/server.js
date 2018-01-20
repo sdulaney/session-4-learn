@@ -77,23 +77,28 @@ app.get('/library', function (request, response) {
 	});
 });
 
-// 3) TODO: Replace adding new book to our array variable to inserting into the MySQL database
 /**
  * Define the route to add a book to the library. We are posted the title, author, isbn,
  * and number of copies.
- * If the inputs are valid, create a new book objects and push it into the array.
+ * If the inputs are valid, create a new book objects and inserts it into the database.
  * Redirect to the library (to re-render the page)
  * If the inputs are not valid, render the error page.
  */
 app.post('/books/add', function(request, response) {
-	let title = request.body.title;
-	let author = request.body.author;
-	let isbn = request.body.isbn;
-	let copies = parseInt(request.body.copies);
+	let inputTitle = request.body.title;
+	let inputAuthor = request.body.author;
+	let inputIsbn = request.body.isbn;
+	let inputCopies = parseInt(request.body.copies);
 	
-	if (title.length > 0 && author.length > 0 && isbn.length > 0 && copies > 0) {
-		books.push({title, author, isbn, copies});
-		response.redirect('/library');
+	if (inputTitle.length > 0 && inputAuthor.length > 0 && inputIsbn.length > 0 && inputCopies > 0) {
+		Book.create({
+			title: inputTitle,
+			author: inputAuthor,
+			copies: inputCopies,
+			isbn: inputIsbn
+		}).then(function() {
+			response.redirect('/library');
+		})
 	} else {
 		console.log("You tried to add an invalid book into the elibrary.");
 		response.redirect('/error');
